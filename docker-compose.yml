@@ -5,8 +5,25 @@ services:
       context: ./docker/pretix
     restart: always
     depends_on:
-      - database
-      - cache
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    environment:
+      PRETIX_URL: ${PRETIX_URL}
+      POSTGRES_USER: ${POSTGRES_USER:-pretix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pretix}
+      POSTGRES_DB: ${POSTGRES_DB:-pretix}
+      MAIL_FROM: ${MAIL_FROM}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_TLS: ${MAIL_TLS:-on}
+      MAIL_SSL: ${MAIL_SSL:-off}
+      TRUST_X_FORWARDED_FOR: ${TRUST_X_FORWARDED_FOR:-true}
+      TRUST_X_FORWARDED_PROTO: ${TRUST_X_FORWARDED_PROTO:-true}
+      TRUST_X_FORWARDED_HOST: ${TRUST_X_FORWARDED_HOST:-true}
     volumes:
       - "pretix_data:/data"
       - "./docker/pretix/pretix.cfg:/etc/pretix/pretix.cfg"
@@ -14,6 +31,12 @@ services:
     networks:
       - backend
       - coolify
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/healthcheck/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=coolify"
@@ -34,12 +57,24 @@ services:
       - "postgres_data:/var/lib/postgresql/data"
     networks:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pretix}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   cache:
     image: "redis:alpine"
     restart: always
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   postgres_data:
