@@ -53,7 +53,7 @@ services:
     build:
       dockerfile: Dockerfile
       context: ./docker/pretix
-    command: ["python", "-m", "pretix", "runperiodic"]
+    command: ["runperiodic"]
     restart: always
     depends_on:
       app:
