@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   app:
     build:
@@ -27,7 +29,6 @@ services:
     volumes:
       - "pretix_data:/data"
       - "./docker/pretix/pretix.cfg:/etc/pretix/pretix.cfg"
-      - "./docker/pretix/crontab:/tmp/crontab"
     networks:
       - backend
       - coolify
@@ -40,17 +41,28 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=coolify"
-      # HTTP Router (for ACME challenge and redirect)
       - "traefik.http.routers.pretix-http.rule=Host(`${PRETIX_DOMAIN}`)"
       - "traefik.http.routers.pretix-http.entrypoints=http"
-      # - "traefik.http.routers.pretix-http.middlewares=redirect-https@file"
-      # HTTPS Router
       - "traefik.http.routers.pretix-https.rule=Host(`${PRETIX_DOMAIN}`)"
       - "traefik.http.routers.pretix-https.entrypoints=https"
       - "traefik.http.routers.pretix-https.tls=true"
       - "traefik.http.routers.pretix-https.tls.certresolver=letsencrypt"
-      # Service
       - "traefik.http.services.pretix.loadbalancer.server.port=80"
+
+  cron:
+    build:
+      dockerfile: Dockerfile
+      context: ./docker/pretix
+    command: ["python", "-m", "pretix", "runperiodic"]
+    restart: always
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - backend
+    volumes:
+      - "pretix_data:/data"
+      - "./docker/pretix/pretix.cfg:/etc/pretix/pretix.cfg"
 
   database:
     image: "postgres:17-alpine"
