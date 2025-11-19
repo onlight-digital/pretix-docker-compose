@@ -1,7 +1,5 @@
-version: '3'
 services:
   app:
-    container_name: pretix_app
     build:
       dockerfile: Dockerfile
       context: ./docker/pretix
@@ -10,34 +8,35 @@ services:
       - database
       - cache
     volumes:
-      - pretix_data:/data
-      - ./docker/pretix/pretix.cfg:/etc/pretix/pretix.cfg
-      #- ./docker/pretix/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./docker/pretix/crontab:/tmp/crontab
-    #ports:
-      #- "8088:80"
-      #- "8443:443"
+      - "pretix_data:/data"
+      - "./docker/pretix/pretix.cfg:/etc/pretix/pretix.cfg"
+      - "./docker/pretix/crontab:/tmp/crontab"
     networks:
       - backend
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      # Router
+      - "traefik.http.routers.pretix.rule=Host(`${PRETIX_DOMAIN}`)"
+      - "traefik.http.routers.pretix.entrypoints=https"
+      - "traefik.http.routers.pretix.tls.certresolver=letsencrypt"
+      - "traefik.http.services.pretix.loadbalancer.server.port=80"
 
   database:
-    image: postgres:17-alpine3.22
-    container_name: database
-    ports:
-      - "5432:5432"
+    image: "postgres:17-alpine"
+    restart: always
     environment:
-      - POSTGRES_USER=pretix
-      - POSTGRES_PASSWORD=pretix
+      POSTGRES_USER: ${POSTGRES_USER:-pretix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pretix}
+      POSTGRES_DB: ${POSTGRES_DB:-pretix}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "postgres_data:/var/lib/postgresql/data"
     networks:
       - backend
 
   cache:
-    image: redis:alpine3.22
-    container_name: redis
-    ports:
-      - "6379:6379"
+    image: "redis:alpine"
     restart: always
     networks:
       - backend
@@ -51,5 +50,5 @@ volumes:
 networks:
   backend:
     driver: bridge
-    #driver_opts:
-      #com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+  coolify:
+    external: true
